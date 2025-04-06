@@ -100,43 +100,49 @@ def Critical_Values(sig,df,tail):
 #Plotting
 
 #Generates a boxplot of a SINGLE dataset
-def Boxplot(A):
+def Boxplot(A, label="", xtext=""):
     if (type(A) == list):
         raise ValueError("Boxplot: More than one dataset provided, terminating")
     
     fig, ax = plt.subplots()
 
-    ax.boxplot(A)
-
+    ax.boxplot(A,label=label)
+    plt.xlabel(xtext)
+    plt.legend()
     plt.show()
 
 #Generates a histogram of a SINGLE dataset
-def Histogram(A,bins=15):
+def Histogram(A,bins=15, label=""):
     if (type(A) == list):
         raise ValueError("Histogram: More than one dataset provided, terminating")
     
-    plt.hist(A, bins = bins, color = 'blue', edgecolor = 'black', alpha = 0.5)
+    plt.hist(A, bins = bins, color = 'blue', edgecolor = 'black', alpha = 0.5,label=label)
     
     plt.ylabel("Count")
     plt.xlabel("Values")
+    plt.legend()
     plt.show()
 
 #Generates a QQplot of a SINGLE dataset
-def QQplot(A):
+def QQplot(A, label="", xtext=""):
     if (type(A) == list):
         raise ValueError("QQplot: More than one dataset provided, terminating")
     
-    sm.qqplot(A, line='q')
+    sm.qqplot(A, line='q',label=label)
+    plt.xlabel(xtext)
     plt.tight_layout()
+    plt.legend()
     plt.show()
 
 #Generates the scatter plot of two datasets
-def Scatterplot(A,B):
+def Scatterplot(A,B,label="",xtext="",ytext=""):
     if (type(A) == list or type(B) == list):
         raise ValueError("Scatterplot: More than one dataset provided, terminating")
 
-    plt.scatter(A,B)
-
+    plt.scatter(A,B,label=label)
+    plt.legend()
+    plt.xlabel(xtext)
+    plt.ylabel(ytext)
     plt.tight_layout()
     plt.show()
 
@@ -161,10 +167,10 @@ def WallyPlot(A):
     plt.show()
     return
 
-def LinRegressionPlot(x,y,sig):
+def LinRegressionPlot(x,y,sig,xtext='x',ytext='y'):
     data = pd.DataFrame({'x': x, 'y': y})
     fit = smf.ols(formula = 'y ~ x', data=data).fit()
-    x1_new = pd.DataFrame({'x': np.linspace(0, 1, 100)})
+    x1_new = pd.DataFrame({'x': np.linspace(min(x), max(x), 100)})
     prediction_summary = fit.get_prediction(x1_new).summary_frame(alpha=sig)
     plt.figure(figsize=(10, 6))
     plt.plot(x, y, ' o', label='Observed data')
@@ -174,8 +180,8 @@ def LinRegressionPlot(x,y,sig):
     prediction_summary['mean_ci_upper'],
     color='red', alpha=0.2, label=f'{(1-sig)*100}% Confidence interval')
     plt.fill_between(x1_new['x'],prediction_summary['obs_ci_lower'],prediction_summary['obs_ci_upper'],color='green', alpha=0.2, label=f'{(1-sig)*100}% Prediction interval')
-    plt.xlabel('x')
-    plt.ylabel('y')
+    plt.xlabel(xtext)
+    plt.ylabel(ytext)
     plt.legend()
     plt.title(f'Fitted Line with {(1-sig)*100}% Confidence and Prediction Intervals')
     plt.show()
@@ -207,11 +213,7 @@ def Norm_CI_Mean(A,alpha):
     mu = A.mean()
     s = A.std(ddof=1)
 
-    print(f"{(1-alpha)*100}% CI for mean of dataset: {stats.t.interval(
-    1-alpha
-    ,df=n-1
-    ,loc=mu
-    ,scale=s/np.sqrt(n))}")
+    print(f"{(1-alpha)*100}% CI for mean of dataset: {stats.t.interval(1-alpha,df=n-1,loc=mu,scale=s/np.sqrt(n))}")
 
 #Generates the confidence interval of the median of a SINGLE dataset
 def Norm_CI_Median(A,alpha):
@@ -371,12 +373,10 @@ def MultiLinPrediction(XDatasets,y,sig,vals):
             Linsentence += " + "
     
     fitData = smf.ols(formula = Linsentence, data=data).fit()
-    valDict = {}
-    for i in range(0,len(vals)):
-        valDict.update({f'x{i}': vals[i]})
-    print(valDict)
+    
+    valDict = {f'x{i}': vals[i] for i in range(len(vals))}
+    new_data = pd.DataFrame([valDict])  # Single row as a list of dicts
 
-    new_data = pd.DataFrame(valDict)
     # Get prediction and confidence intervals
     pd.set_option("display.float_format", None) ## unset option
     pred = fitData.get_prediction(new_data).summary_frame(alpha=sig)
