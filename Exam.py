@@ -335,7 +335,7 @@ def LinPrediction(x,y,sig,val):
     # Get prediction and confidence intervals
     pd.set_option("display.float_format", None) ## unset option
     pred = fitData.get_prediction(new_data).summary_frame(alpha=sig)
-    print(round(pred,2))
+    print(pred)
 
 def MultiLinRegression(XDatasets,y,sig):
     linDict = {'y': y}
@@ -358,6 +358,7 @@ def MultiLinRegression(XDatasets,y,sig):
     error_std = np.sqrt(fitData.mse_resid)
     print(error_std)
 
+
 def MultiLinPrediction(XDatasets,y,sig,vals):
     if (len(XDatasets) != len(vals)):
         raise ValueError("XDatasets or Values have wrong size")
@@ -373,14 +374,14 @@ def MultiLinPrediction(XDatasets,y,sig,vals):
             Linsentence += " + "
     
     fitData = smf.ols(formula = Linsentence, data=data).fit()
-    
+
     valDict = {f'x{i}': vals[i] for i in range(len(vals))}
     new_data = pd.DataFrame([valDict])  # Single row as a list of dicts
 
     # Get prediction and confidence intervals
     pd.set_option("display.float_format", None) ## unset option
     pred = fitData.get_prediction(new_data).summary_frame(alpha=sig)
-    print(round(pred,2))
+    print(pred)
     
 #-----------------------------------------------------------------------------------------------------------------------------------------#'
 print("----- Current results start here -----")
