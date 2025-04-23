@@ -100,50 +100,91 @@ def Critical_Values(sig,df,tail):
 #Plotting
 
 #Generates a boxplot of a SINGLE dataset
-def Boxplot(A, label="", xtext=""):
-    if (type(A) == list):
-        raise ValueError("Boxplot: More than one dataset provided, terminating")
-    
+def Boxplot(A):
+    # Validate input: A should be a list/tuple of 1D array-like structures
+    if not isinstance(A, (list, tuple)):
+        raise ValueError("Boxplot: Input must be a list or tuple of datasets")
+
+    validated = []
+    for i, item in enumerate(A):
+        arr = np.asarray(item)
+        if arr.ndim != 1:
+            raise ValueError(f"Boxplot: Dataset at index {i} is not 1D")
+        validated.append(arr)
+
     fig, ax = plt.subplots()
 
-    ax.boxplot(A,label=label)
-    plt.xlabel(xtext)
-    plt.legend()
+    ax.boxplot(validated,showmeans=True)
+
+    ax.set_title("Boxplots")
+    ax.set_xlabel("Dataset Index")
+    ax.set_ylabel("Values")
+
     plt.show()
 
 #Generates a histogram of a SINGLE dataset
-def Histogram(A,bins=15, label=""):
-    if (type(A) == list):
-        raise ValueError("Histogram: More than one dataset provided, terminating")
-    
-    plt.hist(A, bins = bins, color = 'blue', edgecolor = 'black', alpha = 0.5,label=label)
-    
-    plt.ylabel("Count")
-    plt.xlabel("Values")
-    plt.legend()
+def Histogram(A, bins = 15):
+    if not isinstance(A, (list, tuple)):
+        raise ValueError("Histogram: Input must be a list or tuple of datasets")
+
+    validated = []
+    for i, item in enumerate(A):
+        arr = np.asarray(item)
+        if arr.ndim != 1:
+            raise ValueError(f"Histogram: Dataset at index {i} is not 1D")
+        validated.append(arr)
+
+    fig, ax = plt.subplots()
+
+    for i, data in enumerate(validated):
+        ax.hist(data, bins, alpha=0.5, label=f'Dataset {i+1}')
+
+    ax.set_title("Histograms")
+    ax.set_xlabel("Value")
+    ax.set_ylabel("Frequency")
+    ax.legend()
+
     plt.show()
 
 #Generates a QQplot of a SINGLE dataset
-def QQplot(A, label="", xtext=""):
+def QQplot(A):
     if (type(A) == list):
         raise ValueError("QQplot: More than one dataset provided, terminating")
     
-    sm.qqplot(A, line='q',label=label)
-    plt.xlabel(xtext)
+    sm.qqplot(A, line='q')
     plt.tight_layout()
-    plt.legend()
     plt.show()
 
 #Generates the scatter plot of two datasets
-def Scatterplot(A,B,label="",xtext="",ytext=""):
-    if (type(A) == list or type(B) == list):
-        raise ValueError("Scatterplot: More than one dataset provided, terminating")
+def Scatterplot(A,B):
+    if not (isinstance(A, (list, tuple)) and isinstance(B, (list, tuple))):
+        raise ValueError("Scatter: X and Y must be lists or tuples of datasets")
+    if len(A) != len(B):
+        raise ValueError("Scatter: X and Y must contain the same number of datasets")
 
-    plt.scatter(A,B,label=label)
-    plt.legend()
-    plt.xlabel(xtext)
-    plt.ylabel(ytext)
-    plt.tight_layout()
+    validated_x = []
+    validated_y = []
+
+    for i in range(len(A)):
+        x_arr = np.asarray(A[i])
+        y_arr = np.asarray(B[i])
+        if x_arr.ndim != 1 or y_arr.ndim != 1:
+            raise ValueError(f"Scatter: Dataset pair at index {i} must be 1D")
+        if len(x_arr) != len(y_arr):
+            raise ValueError(f"Scatter: Length mismatch in pair at index {i}")
+        validated_x.append(x_arr)
+        validated_y.append(y_arr)
+
+    fig, ax = plt.subplots()
+
+    for i, (x, y) in enumerate(zip(validated_x, validated_y)):
+        ax.scatter(x, y, label=f'Dataset {i+1}', alpha=0.7)
+
+    ax.set_title("Scatter Plots")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.legend()
+
     plt.show()
 
 #Generates the wallyplot of a SINGLE dataset
@@ -167,10 +208,10 @@ def WallyPlot(A):
     plt.show()
     return
 
-def LinRegressionPlot(x,y,sig,xtext='x',ytext='y'):
+def LinRegressionPlot(x,y,sig):
     data = pd.DataFrame({'x': x, 'y': y})
     fit = smf.ols(formula = 'y ~ x', data=data).fit()
-    x1_new = pd.DataFrame({'x': np.linspace(min(x), max(x), 100)})
+    x1_new = pd.DataFrame({'x': np.linspace(0, 1, 100)})
     prediction_summary = fit.get_prediction(x1_new).summary_frame(alpha=sig)
     plt.figure(figsize=(10, 6))
     plt.plot(x, y, ' o', label='Observed data')
@@ -180,8 +221,8 @@ def LinRegressionPlot(x,y,sig,xtext='x',ytext='y'):
     prediction_summary['mean_ci_upper'],
     color='red', alpha=0.2, label=f'{(1-sig)*100}% Confidence interval')
     plt.fill_between(x1_new['x'],prediction_summary['obs_ci_lower'],prediction_summary['obs_ci_upper'],color='green', alpha=0.2, label=f'{(1-sig)*100}% Prediction interval')
-    plt.xlabel(xtext)
-    plt.ylabel(ytext)
+    plt.xlabel('x')
+    plt.ylabel('y')
     plt.legend()
     plt.title(f'Fitted Line with {(1-sig)*100}% Confidence and Prediction Intervals')
     plt.show()
@@ -213,7 +254,11 @@ def Norm_CI_Mean(A,alpha):
     mu = A.mean()
     s = A.std(ddof=1)
 
-    print(f"{(1-alpha)*100}% CI for mean of dataset: {stats.t.interval(1-alpha,df=n-1,loc=mu,scale=s/np.sqrt(n))}")
+    print(f"{(1-alpha)*100}% CI for mean of dataset: {stats.t.interval(
+    1-alpha
+    ,df=n-1
+    ,loc=mu
+    ,scale=s/np.sqrt(n))}")
 
 #Generates the confidence interval of the median of a SINGLE dataset
 def Norm_CI_Median(A,alpha):
@@ -229,6 +274,12 @@ def Norm_CI_Median(A,alpha):
     KI = stats.t.interval(1-alpha, df=n-1, loc=A_log.mean(),scale=std_err)
 
     print(f"{(1-alpha)*100}% CI for median of dataset: ({np.exp(KI)})")
+
+def Bin_CI_Proportion_Small():
+    pass
+
+def Bin_CI_Proportion_Large():
+    pass
 
 #--------------------------------------------------------------------------------------------------------------------------------#
 #Power
@@ -258,7 +309,6 @@ def CalcMeasureableSize(nobs,sd,delta,sig,ratio,power):
 def Hypothesis(A,hyp):
     if (type(A) == list):
         raise ValueError("Hypothesis: More than one dataset provided, terminating")
-        return
 
     res = stats.ttest_1samp(A, popmean = hyp)
     print("t-obs: ", res[0])
@@ -284,6 +334,9 @@ def WelchTest_Equal(A,B):
     print(f"Degrees of freedom: {df}")
     print(f"t-obs: {res[0]}")
     print(f"p-value: {res[1]}")
+
+def TableHypo_Test_Equal():
+    pass
 
 #-------------------------------------------------------------------------------------------------------------------------------#
 #Non-Parametric Bootstrapping
@@ -335,7 +388,7 @@ def LinPrediction(x,y,sig,val):
     # Get prediction and confidence intervals
     pd.set_option("display.float_format", None) ## unset option
     pred = fitData.get_prediction(new_data).summary_frame(alpha=sig)
-    print(pred)
+    print(round(pred,2))
 
 def MultiLinRegression(XDatasets,y,sig):
     linDict = {'y': y}
@@ -358,7 +411,6 @@ def MultiLinRegression(XDatasets,y,sig):
     error_std = np.sqrt(fitData.mse_resid)
     print(error_std)
 
-
 def MultiLinPrediction(XDatasets,y,sig,vals):
     if (len(XDatasets) != len(vals)):
         raise ValueError("XDatasets or Values have wrong size")
@@ -374,14 +426,131 @@ def MultiLinPrediction(XDatasets,y,sig,vals):
             Linsentence += " + "
     
     fitData = smf.ols(formula = Linsentence, data=data).fit()
+    valDict = {}
+    for i in range(0,len(vals)):
+        valDict.update({f'x{i}': vals[i]})
+    print(valDict)
 
-    valDict = {f'x{i}': vals[i] for i in range(len(vals))}
-    new_data = pd.DataFrame([valDict])  # Single row as a list of dicts
-
+    new_data = pd.DataFrame(valDict)
     # Get prediction and confidence intervals
     pd.set_option("display.float_format", None) ## unset option
     pred = fitData.get_prediction(new_data).summary_frame(alpha=sig)
-    print(pred)
+    print(round(pred,2))
     
+#-----------------------------------------------------------------------------------------------------------------------------------------#'
+#Anova testing
+def AnovaTable(A,sig):
+    data = {"group":[],"value":[]}
+    for i in range(0,len(A)):
+        for j in A[i]:
+            data["group"].append(str(i))
+            data["value"].append(j)
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+    print(anova_table)
+
+    k = len(A)
+    M = (k*(k-1))/2
+
+    print(f"bernolli alpha: {sig/M}")
+    #C(group).mean_sq = MS(Tr) and Residual.mean_sq = MSE. The SS version is from sum_sq
+
+def AnovaCriticalValues(A,sig):
+    data = {"group":[],"value":[]}
+    for i in range(0,len(A)):
+        for j in A[i]:
+            data["group"].append(str(i))
+            data["value"].append(j)
+
+    dfn = len(A)-1
+    dfd = len(data['value'])-len(A)
+
+    fcrit= stats.f.ppf(1-sig, dfn = dfn, dfd = dfd)
+
+    print(f"Degrees of freedom | n : {dfn} , d : {dfd}")
+    print(f"F-crit: {fcrit}")
+
+def CI_AnovaTest(A,sig,NameArray=[]):
+    data = {"group":[],"value":[]}
+    for i in range(0,len(A)):
+        for j in A[i]:
+            data["group"].append(str(i))
+            data["value"].append(j)
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+
+    n = len(data['value'])
+    k = len(A)
+
+    for i in range(0,len(A)):
+        for j in range(0,len(A)):
+            if i != j:
+                delta = np.mean(A[i])-np.mean(A[j])
+                tstat = stats.t.ppf(1-sig/2,n-k)
+                SSE = anova_table["sum_sq"]["Residual"]
+                ni = len(A[i])
+                nj = len(A[j])
+                lower = delta - tstat*(((SSE/(n-k))*(1/ni + 1/nj))**(1/2))
+                upper = delta + tstat*(((SSE/(n-k))*(1/ni + 1/nj))**(1/2))
+                if NameArray != []:
+                    print(f"difference {(1-sig)*100} confidence interval {NameArray[i]}-{NameArray[j]}: [ {lower} , {upper} ]")
+                else:
+                    print(f"difference {(1-sig)*100} confidence interval {i}-{j}: [ {lower} , {upper} ]")
+
+def AnovaHypTest(A,sig,NameArray=[]):
+    data = {"group":[],"value":[]}
+    for i in range(0,len(A)):
+        for j in A[i]:
+            data["group"].append(str(i))
+            data["value"].append(j)
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+
+    n = len(data['value'])
+    k = len(A)
+    M = (k*(k-1))/2
+
+    for i in range(0,len(A)):
+        for j in range(0,len(A)):
+            if i != j:
+                delta = np.mean(A[i])-np.mean(A[j])
+                SSE = anova_table["sum_sq"]["Residual"]
+                ni = len(A[i])
+                nj = len(A[j])
+
+                tobs = delta/(((SSE/(n-k))*(1/ni + 1/nj))**(1/2))
+                pobs = 2 * (1 - stats.t.cdf(abs(tobs), df=n-k))
+                
+                if NameArray != []:
+                    print(f"Hyptest {NameArray[i]}-{NameArray[j]}: tobs = {tobs} , pobs = {pobs} ]")
+                else:
+                    print(f"Hyptest {NameArray[i]}-{NameArray[j]}: tobs = {i} , pobs = {j} ]")
+    print(f"bernolli alpha: {sig/M}")
+
+def Anova_Residual_Analysis(A,sig,NameArray=[]):
+    data = {"group":[],"value":[]}
+    for i in range(0,len(A)):
+        for j in A[i]:
+            data["group"].append(str(i))
+            data["value"].append(j)
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+
+    n = len(data['value'])
+    k = len(A)
+    Residuals = fit.resid
+
+    print("Normality")
+    QQplot(Residuals)
+
+    print("Variance by group")
+    for i in range(0,len(A)):
+        print(f" {i}: {np.var(A[i])}")
+
+
 #-----------------------------------------------------------------------------------------------------------------------------------------#'
 print("----- Current results start here -----")
