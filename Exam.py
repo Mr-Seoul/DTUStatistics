@@ -320,23 +320,20 @@ def Single_Proportion_CI(tot,successful,sig):
 #Power
 
 def CalcPower(nobs,sd,delta,sig,ratio,power):
-    #Note that for sig = 0.05, alpha must be 0.95. Thus alpha = 1-sig
     #Testpower for INDEPENDANT 2 samples
-    calcpower = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=1-sig, nobs1=nobs,ratio=ratio)
+    calcpower = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=sig, nobs1=nobs,ratio=ratio)
 
     return calcpower
 
 def CalcSize(nobs,sd,delta,sig,ratio,power):
-    #Note that for sig = 0.05, alpha must be 0.95. Thus alpha = 1-sig
     #Testpower for INDEPENDANT 2 samples
-    calcsize = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=1-sig, power=power,ratio=ratio)
+    calcsize = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=sig, power=power,ratio=ratio)
 
     return (calcsize,calcsize*ratio)
 
 def CalcMeasureableSize(nobs,sd,delta,sig,ratio,power):
-    #Note that for sig = 0.05, alpha must be 0.95. Thus alpha = 1-sig
     #Testpower for INDEPENDANT 2 samples
-    effect_size = smp.TTestPower().solve_power(nobs=nobs, alpha=1-sig,power=power,ratio=ratio)
+    effect_size = smp.TTestPower().solve_power(nobs=nobs, alpha=sig,power=power,ratio=ratio)
 
     return effect_size*sd
 
