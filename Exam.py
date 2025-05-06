@@ -275,30 +275,68 @@ def Norm_CI_Median(A,alpha):
 
     print(f"{(1-alpha)*100}% CI for median of dataset: ({np.exp(KI)})")
 
-def Bin_CI_Proportion_Small():
-    pass
+def Mean_CI_Single_Sample(A,sig,hyp):
+    if (type(A[0]) == list):
+        raise ValueError("Hypothesis: More than one dataset provided, terminating")
 
-def Bin_CI_Proportion_Large():
-    pass
+    res = stats.ttest_1samp(A, popmean = hyp)
+
+    # Confidence interval directly from t-test
+    print(res.confidence_interval(1-sig))
+    print("If hyp is in range, it is possible")
+
+def Mean_Difference_Two_Samples_CI(A,B,sig):
+    if (type(A[0]) == list or type(B[0]) == list):
+        raise ValueError("WelchTest: More than one dataset provided, terminating")
+    n1 = len(A)
+    n2 = len(B)
+    s1_sq = np.var(A, ddof=1)
+    s2_sq = np.var(B, ddof=1)
+    
+    df = ((s1_sq / n1 + s2_sq / n2) ** 2) / (
+        (s1_sq / n1) ** 2 / (n1 - 1) + (s2_sq / n2) ** 2 / (n2 - 1)
+    )
+    res = stats.ttest_ind(A,B, equal_var=False)
+
+    print(res.confidence_interval(1-sig))
+    print("If hyp is in range, it is possible")
+
+def Single_Proportion_CI(tot,successful,sig):
+    p_hat = successful/tot
+    se_p_hat = np.sqrt(p_hat*(1-p_hat)/tot)
+    low = tot*p_hat
+    high = tot*(1-p_hat)
+    if low > 15 and high > 15:
+        print("Large Sample")
+        print([p_hat - stats.norm.ppf(1-sig/2)*se_p_hat, p_hat + stats.norm.ppf(1-sig/2)*se_p_hat])
+    else:
+        print("Small Sample, using + 2 method")
+        p_hat = (successful+2)/(tot+4)
+        se_p_hat = np.sqrt(p_hat*(1-p_hat)/(tot+4))
+        print([p_hat - stats.norm.ppf(1-sig/2)*se_p_hat, p_hat + stats.norm.ppf(1-sig/2)*se_p_hat])
+
 
 #--------------------------------------------------------------------------------------------------------------------------------#
 #Power
 
 def CalcPower(nobs,sd,delta,sig,ratio,power):
+    #Note that for sig = 0.05, alpha must be 0.95. Thus alpha = 1-sig
     #Testpower for INDEPENDANT 2 samples
-    calcpower = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=sig, nobs1=nobs,ratio=ratio)
+    calcpower = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=1-sig, nobs1=nobs,ratio=ratio)
 
     return calcpower
 
 def CalcSize(nobs,sd,delta,sig,ratio,power):
+    #Note that for sig = 0.05, alpha must be 0.95. Thus alpha = 1-sig
     #Testpower for INDEPENDANT 2 samples
-    calcsize = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=sig, power=power,ratio=ratio)
+    calcsize = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=1-sig, power=power,ratio=ratio)
 
     return (calcsize,calcsize*ratio)
 
 def CalcMeasureableSize(nobs,sd,delta,sig,ratio,power):
+    #Note that for sig = 0.05, alpha must be 0.95. Thus alpha = 1-sig
     #Testpower for INDEPENDANT 2 samples
-    effect_size = smp.TTestPower().solve_power(nobs=nobs, alpha=sig,power=power,ratio=ratio)
+    effect_size = smp.TTestPower().solve_power(nobs=nobs, alpha=1-sig,power=power,ratio=ratio)
 
     return effect_size*sd
 
@@ -306,20 +344,17 @@ def CalcMeasureableSize(nobs,sd,delta,sig,ratio,power):
 #Hypothesis testing
 
 #Calculate t and p for single mean hypothesis
-def Hypothesis(A,hyp):
-    if (type(A) == list):
+def Hypothesis(A,hyp,sig):
+    if (type(A[0]) == list):
         raise ValueError("Hypothesis: More than one dataset provided, terminating")
 
     res = stats.ttest_1samp(A, popmean = hyp)
     print("t-obs: ", res[0])
     print("p-value: ", res[1])
 
-    # Confidence interval directly from t-test
-    print(res.confidence_interval())
-
 #Calculate v,t and p for welchttest
 def WelchTest_Equal(A,B):
-    if (type(A) == list or type(B) == list):
+    if (type(A[0]) == list or type(B[0]) == list):
         raise ValueError("WelchTest: More than one dataset provided, terminating")
     n1 = len(A)
     n2 = len(B)
@@ -335,8 +370,21 @@ def WelchTest_Equal(A,B):
     print(f"t-obs: {res[0]}")
     print(f"p-value: {res[1]}")
 
-def TableHypo_Test_Equal():
-    pass
+def TableHypo_Test_Equal(A,RowNames,ColumnNames):
+    table_data = np.array(A)
+    pill_study = pd.DataFrame(table_data, index=RowNames, columns=ColumnNames)
+    print(pill_study)
+    chi2, p_val, dof, (expected) = stats.chi2_contingency(pill_study, correction=False)
+    print
+    print("Chai-square test statistic:", chi2)
+    print("P-value:", p_val)
+    print(f"Dof: {dof}")
+
+def ProportionHypTest(tot,successes,psample,phyp):
+    z_obs,p_value = smprop.proportions_ztest(count=successes, nobs=tot, value=psample, prop_var=phyp) 
+    # without showing only four decimal places
+    print(f"p-value: {2 * stats.norm.cdf(z_obs, loc=0, scale=1)}")
+
 
 #-------------------------------------------------------------------------------------------------------------------------------#
 #Non-Parametric Bootstrapping
@@ -439,7 +487,7 @@ def MultiLinPrediction(XDatasets,y,sig,vals):
     
 #-----------------------------------------------------------------------------------------------------------------------------------------#'
 #Anova testing
-def AnovaTable(A,sig):
+def OneWayAnovaTable(A):
     data = {"group":[],"value":[]}
     for i in range(0,len(A)):
         for j in A[i]:
@@ -450,18 +498,25 @@ def AnovaTable(A,sig):
     anova_table = sm.stats.anova_lm(fit)
     print(anova_table)
 
-    k = len(A)
-    M = (k*(k-1))/2
+def TwoWayAnovaTable(A):
+    data = {"value":[],"group":[],"method":[]}
+    for i in range(0,len(A)):
+        for j in range(0,len(A[i])):
+            data["value"].append(A[i][j])
+            data["group"].append(str(i))
+            data["method"].append(str(j))
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group) + C(method)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+    print(anova_table)
 
-    print(f"bernolli alpha: {sig/M}")
-    #C(group).mean_sq = MS(Tr) and Residual.mean_sq = MSE. The SS version is from sum_sq
-
-def AnovaCriticalValues(A,sig):
+def OneWayAnovaCriticalValues(A,sig):
     data = {"group":[],"value":[]}
     for i in range(0,len(A)):
         for j in A[i]:
             data["group"].append(str(i))
             data["value"].append(j)
+    df = pd.DataFrame(data)
 
     dfn = len(A)-1
     dfd = len(data['value'])-len(A)
@@ -471,7 +526,123 @@ def AnovaCriticalValues(A,sig):
     print(f"Degrees of freedom | n : {dfn} , d : {dfd}")
     print(f"F-crit: {fcrit}")
 
-def CI_AnovaTest(A,sig,NameArray=[]):
+def TwoWayAnovaCriticalValues(A,sig):
+    data = {"value":[],"group":[],"method":[]}
+    for i in range(0,len(A)):
+        for j in range(0,len(A[i])):
+            data["value"].append(A[i][j])
+            data["group"].append(str(i))
+            data["method"].append(str(j))
+    df = pd.DataFrame(data)
+    print(df)
+
+    dfk = len(A)-1
+    dfl = len(A[0]) - 1
+    dfd = dfk*dfl
+
+    fcritgroup= stats.f.ppf(1-sig, dfn = dfk, dfd = dfd)
+    fcritmethod= stats.f.ppf(1-sig, dfn = dfl, dfd = dfd)
+
+    print(f"Degrees of freedom | dk : {dfk} dl: {dfl}, d : {dfd}")
+    print(f"F-crit group: {fcritgroup}")
+    print(f"F-crit method: {fcritmethod}")
+
+def SingleOneWayCI_AnovaTest(A,index1,index2,sig,NameArray=[]):
+    data = {"group":[],"value":[]}
+    for i in range(0,len(A)):
+        for j in A[i]:
+            data["group"].append(str(i))
+            data["value"].append(j)
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+
+    if index1 == index2:
+        print("Equal indices Error")
+        return
+
+    n = len(data['value'])
+    k = len(A)
+
+    delta = np.mean(A[index1])-np.mean(A[index2])
+    tstat = stats.t.ppf(1-sig/2,n-k)
+    SSE = anova_table["sum_sq"]["Residual"]
+    ni = len(A[index1])
+    nj = len(A[index2])
+    lower = delta - tstat*(((SSE/(n-k))*(1/ni + 1/nj))**(1/2))
+    upper = delta + tstat*(((SSE/(n-k))*(1/ni + 1/nj))**(1/2))
+    if NameArray != []:
+        print(f"difference {(1-sig)*100} confidence interval {NameArray[index1]}-{NameArray[index2]}: [ {lower} , {upper} ]")
+    else:
+        print(f"difference {(1-sig)*100} confidence interval {i}-{j}: [ {lower} , {upper} ]")
+    print(f"Do NOT use bernolli's adjusted alpha here: sig = {sig}")
+
+def SingleTwoWayCI_AnovaTest(A,index1,index2,typeTest,sig,GroupNameArray=[],MethodNameArray=[]):
+    data = {"value":[],"group":[],"method":[]}
+    for i in range(0,len(A)):
+        for j in range(0,len(A[i])):
+            data["value"].append(A[i][j])
+            data["group"].append(str(i))
+            data["method"].append(str(j))
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group) + C(method)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+
+    if index1 == index2:
+        print("Equal indices Error")
+        return
+
+    k = len(A)
+    l = len(A[0])
+
+    dfl = (k-1)*(l-1)
+    if typeTest == "group":
+        print("Single CI Group")
+        delta = np.mean(A[index1])-np.mean(A[index2])
+        tstat = stats.t.ppf(1 - sig/2,dfl)
+        SSE = anova_table["sum_sq"]["Residual"]
+        ni = len(A[index1])
+        nj = len(A[index2])
+        lower = delta - tstat*(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+        upper = delta + tstat*(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+        if GroupNameArray != []:
+            print(f"difference {(1-sig)*100} confidence interval {GroupNameArray[index1]}-{GroupNameArray[index2]}: [ {lower} , {upper} ]")
+        else:
+            print(f"difference {(1-sig)*100} confidence interval {index1}-{index2}: [ {lower} , {upper} ]")
+    elif typeTest == "method":
+        print("CI-Method")
+        def meancollumn(arr,index):
+            sum = 0
+            num = 0
+            for subarr in arr:
+                if len(subarr) > index:
+                    sum += subarr[index]
+                    num += 1
+            return sum/num
+        
+        def numcollumn(arr,index):
+            sum = 0
+            for subarr in arr:
+                if len(subarr) > index:
+                    sum += 1
+            return sum
+        
+        delta = np.mean(meancollumn(A,index1))-np.mean(meancollumn(A,index2))
+        tstat = stats.t.ppf(1-sig/2,dfl)
+        SSE = anova_table["sum_sq"]["Residual"]
+        ni = numcollumn(A,index1)
+        nj = numcollumn(A,index2)
+        lower = delta - tstat*(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+        upper = delta + tstat*(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+        if MethodNameArray != []:
+            print(f"difference {(1-sig)*100} confidence interval {MethodNameArray[index1]}-{MethodNameArray[index2]}: [ {lower} , {upper} ]")
+        else:
+            print(f"difference {(1-sig)*100} confidence interval {index1}-{index2}: [ {lower} , {upper} ]")
+    else:
+        print("Wrong Test Type. Try 'group' or 'method'")
+    print(f"Do NOT use bernolli's adjusted alpha here: sig = {sig}")
+
+def AllOneWayCI_AnovaTest(A,sig,NameArray=[]):
     data = {"group":[],"value":[]}
     for i in range(0,len(A)):
         for j in A[i]:
@@ -488,7 +659,9 @@ def CI_AnovaTest(A,sig,NameArray=[]):
         for j in range(0,len(A)):
             if i != j:
                 delta = np.mean(A[i])-np.mean(A[j])
-                tstat = stats.t.ppf(1-sig/2,n-k)
+                M = k*(k-1)/2
+                bonSig = sig/M
+                tstat = stats.t.ppf(1-bonSig/2,n-k)
                 SSE = anova_table["sum_sq"]["Residual"]
                 ni = len(A[i])
                 nj = len(A[j])
@@ -498,8 +671,179 @@ def CI_AnovaTest(A,sig,NameArray=[]):
                     print(f"difference {(1-sig)*100} confidence interval {NameArray[i]}-{NameArray[j]}: [ {lower} , {upper} ]")
                 else:
                     print(f"difference {(1-sig)*100} confidence interval {i}-{j}: [ {lower} , {upper} ]")
+    print(f"BernolliSigma = {bonSig}")
 
-def AnovaHypTest(A,sig,NameArray=[]):
+def AllTwoWayCI_AnovaTest(A,sig,GroupNameArray=[],MethodNameArray=[]):
+    data = {"value":[],"group":[],"method":[]}
+    for i in range(0,len(A)):
+        for j in range(0,len(A[i])):
+            data["value"].append(A[i][j])
+            data["group"].append(str(i))
+            data["method"].append(str(j))
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group) + C(method)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+
+    k = len(A)
+    l = len(A[0])
+
+    dfl = (k-1)*(l-1)
+    print("CI - Group")
+    for i in range(0,len(A)):
+        for j in range(0,len(A)):
+            if i != j:
+                M = k*(k-1)/2
+                bonSig = sig/M
+                delta = np.mean(A[i])-np.mean(A[j])
+                tstat = stats.t.ppf(1 - bonSig/2,dfl)
+                SSE = anova_table["sum_sq"]["Residual"]
+                ni = len(A[i])
+                nj = len(A[j])
+                lower = delta - tstat*(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+                upper = delta + tstat*(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+                if GroupNameArray != []:
+                    print(f"difference {(1-sig)*100} confidence interval {GroupNameArray[i]}-{GroupNameArray[j]}: [ {lower} , {upper} ]")
+                else:
+                    print(f"difference {(1-sig)*100} confidence interval {i}-{j}: [ {lower} , {upper} ]")
+    print("CI-Method")
+    for i in range(0,len(A[0])):
+        for j in range(0,len(A[0])):
+            if i != j:
+                def meancollumn(arr,index):
+                    sum = 0
+                    num = 0
+                    for subarr in arr:
+                        if len(subarr) > index:
+                            sum += subarr[index]
+                            num += 1
+                    return sum/num
+                
+                def numcollumn(arr,index):
+                    sum = 0
+                    for subarr in arr:
+                        if len(subarr) > index:
+                            sum += 1
+                    return sum
+                
+                delta = np.mean(meancollumn(A,i))-np.mean(meancollumn(A,j))
+                M = l*(l-1)/2
+                bonSig = sig/M
+                tstat = stats.t.ppf(1-bonSig/2,dfl)
+                SSE = anova_table["sum_sq"]["Residual"]
+                ni = numcollumn(A,i)
+                nj = numcollumn(A,j)
+                lower = delta - tstat*(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+                upper = delta + tstat*(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+                if MethodNameArray != []:
+                    print(f"difference {(1-sig)*100} confidence interval {MethodNameArray[i]}-{MethodNameArray[j]}: [ {lower} , {upper} ]")
+                else:
+                    print(f"difference {(1-sig)*100} confidence interval {i}-{j}: [ {lower} , {upper} ]")
+    print(f"BernolliSigma = {bonSig}")
+
+def SingleOneWayAnovaHypTest(A,sig,index1,index2,NameArray=[]):
+    data = {"group":[],"value":[]}
+    for i in range(0,len(A)):
+        for j in A[i]:
+            data["group"].append(str(i))
+            data["value"].append(j)
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+
+    if index1 == index2:
+        print("Equal indices Error")
+        return
+
+    n = len(data['value'])
+    k = len(A)
+    
+    print("Single Hyp test - Group")
+    delta = np.mean(A[index1])-np.mean(A[index2])
+    SSE = anova_table["sum_sq"]["Residual"]
+    ni = len(A[index1])
+    nj = len(A[index2])
+
+    tobs = delta/(((SSE/(n-k))*(1/ni + 1/nj))**(1/2))
+    pobs = 2 * (1 - stats.t.cdf(abs(tobs), df=n-k))
+    
+    if NameArray != []:
+        print(f"Hyptest {NameArray[index1]}-{NameArray[index2]}: tobs = {tobs} , pobs = {pobs} ]")
+    else:
+        print(f"Hyptest {index1}-{index2}: tobs = {tobs} , pobs = {pobs} ]")
+    print(f"Do NOT use bernolli's adjusted alpha here: sig = {sig}")
+
+def SingleTwoWayAnovaHypTest(A,sig,index1,index2,testType,GroupNameArray=[],MethodNameArray = []):
+    data = {"value":[],"group":[],"method":[]}
+    for i in range(0,len(A)):
+        for j in range(0,len(A[i])):
+            data["value"].append(A[i][j])
+            data["group"].append(str(i))
+            data["method"].append(str(j))
+    df = pd.DataFrame(data)
+    print(df)
+    fit = smf.ols("value ~ C(group) + C(method)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+
+    if index1 == index2:
+        print("Equal indices Error")
+        return
+
+    k = len(A)
+    l = len(A[0])
+
+    dfl = (k-1)*(l-1)
+    
+    if testType == "group":
+        print("Single Hyp test - Group")
+        delta = np.mean(A[index1])-np.mean(A[index2])
+        SSE = anova_table["sum_sq"]["Residual"]
+        ni = len(A[index1])
+        nj = len(A[index2])
+
+        tobs = delta/(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+        pobs = 2 * (1 - stats.t.cdf(abs(tobs), df=dfl))
+        
+        if GroupNameArray != []:
+            print(f"Hyptest {GroupNameArray[index1]}-{GroupNameArray[index2]}: tobs = {tobs} , pobs = {pobs} ]")
+        else:
+            print(f"Hyptest {index1}-{index2}: tobs = {tobs} , pobs = {pobs} ]")
+    elif testType == "method":
+    
+        print("Single Hyp test - Method")
+        def meancollumn(arr,index):
+            sum = 0
+            num = 0
+            for subarr in arr:
+                if len(subarr) > index:
+                    sum += subarr[index]
+                    num += 1
+            return sum/num
+        
+        def numcollumn(arr,index):
+            sum = 0
+            for subarr in arr:
+                if len(subarr) > index:
+                    sum += 1
+            return sum
+
+        delta = meancollumn(A,index1)-meancollumn(A,index2)
+        SSE = anova_table["sum_sq"]["Residual"]
+
+        ni = numcollumn(A,i)
+        nj = numcollumn(A,j)
+
+        tobs = delta/(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+        pobs = 2 * (1 - stats.t.cdf(abs(tobs), df=dfl))
+        
+        if MethodNameArray != []:
+            print(f"Hyptest {MethodNameArray[i]}-{MethodNameArray[j]}: tobs = {tobs} , pobs = {pobs} ]")
+        else:
+            print(f"Hyptest {i}-{j}: tobs = {tobs} , pobs = {pobs} ]")
+    else:
+        print("Wrong Test Type. Try 'group' or 'method'")
+    print(f"Do NOT use bernolli's adjusted alpha here: sig = {sig}")
+
+def AllOneWayAnovaHypTest(A,sig,NameArray=[]):
     data = {"group":[],"value":[]}
     for i in range(0,len(A)):
         for j in A[i]:
@@ -527,10 +871,81 @@ def AnovaHypTest(A,sig,NameArray=[]):
                 if NameArray != []:
                     print(f"Hyptest {NameArray[i]}-{NameArray[j]}: tobs = {tobs} , pobs = {pobs} ]")
                 else:
-                    print(f"Hyptest {NameArray[i]}-{NameArray[j]}: tobs = {i} , pobs = {j} ]")
+                    print(f"Hyptest {i}-{j}: tobs = {tobs} , pobs = {pobs} ]")
     print(f"bernolli alpha: {sig/M}")
 
-def Anova_Residual_Analysis(A,sig,NameArray=[]):
+def AllTwoWayAnovaHypTest(A,sig,GroupNameArray=[],MethodNameArray = []):
+    data = {"value":[],"group":[],"method":[]}
+    for i in range(0,len(A)):
+        for j in range(0,len(A[i])):
+            data["value"].append(A[i][j])
+            data["group"].append(str(i))
+            data["method"].append(str(j))
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group) + C(method)", data=df).fit()
+    anova_table = sm.stats.anova_lm(fit)
+
+    k = len(A)
+    l = len(A[0])
+
+    dfl = (k-1)*(l-1)
+
+    print("Groups")
+    for i in range(0,len(A)):
+        for j in range(0,len(A)):
+            if i != j:
+                delta = np.mean(A[i])-np.mean(A[j])
+                SSE = anova_table["sum_sq"]["Residual"]
+                ni = len(A[i])
+                nj = len(A[j])
+
+                tobs = delta/(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+                pobs = 2 * (1 - stats.t.cdf(abs(tobs), df=dfl))
+                
+                if GroupNameArray != []:
+                    print(f"Hyptest {GroupNameArray[i]}-{GroupNameArray[j]}: tobs = {tobs} , pobs = {pobs} ]")
+                else:
+                    print(f"Hyptest {i}-{j}: tobs = {tobs} , pobs = {pobs} ]")
+    M = (k*(k-1))/2
+    print(f"bernolli alpha: {sig/M}")
+    print("")
+    print("Methods")
+    for i in range(0,len(A[0])):
+        for j in range(0,len(A[0])):
+            if i != j:
+                def meancollumn(arr,index):
+                    sum = 0
+                    num = 0
+                    for subarr in arr:
+                        if len(subarr) > index:
+                            sum += subarr[index]
+                            num += 1
+                    return sum/num
+                
+                def numcollumn(arr,index):
+                    sum = 0
+                    for subarr in arr:
+                        if len(subarr) > index:
+                            sum += 1
+                    return sum
+
+                delta = meancollumn(A,i)-meancollumn(A,j)
+                SSE = anova_table["sum_sq"]["Residual"]
+
+                ni = numcollumn(A,i)
+                nj = numcollumn(A,j)
+
+                tobs = delta/(((SSE/(dfl))*(1/ni + 1/nj))**(1/2))
+                pobs = 2 * (1 - stats.t.cdf(abs(tobs), df=dfl))
+                
+                if MethodNameArray != []:
+                    print(f"Hyptest {MethodNameArray[i]}-{MethodNameArray[j]}: tobs = {tobs} , pobs = {pobs} ]")
+                else:
+                    print(f"Hyptest {i}-{j}: tobs = {tobs} , pobs = {pobs} ]")
+    M = (l*(l-1))/2
+    print(f"bernolli alpha: {sig/M}")
+
+def OneWayAnova_Residual_Analysis(A,sig,NameArray=[]):
     data = {"group":[],"value":[]}
     for i in range(0,len(A)):
         for j in A[i]:
@@ -538,7 +953,6 @@ def Anova_Residual_Analysis(A,sig,NameArray=[]):
             data["value"].append(j)
     df = pd.DataFrame(data)
     fit = smf.ols("value ~ C(group)", data=df).fit()
-    anova_table = sm.stats.anova_lm(fit)
 
     n = len(data['value'])
     k = len(A)
@@ -549,8 +963,48 @@ def Anova_Residual_Analysis(A,sig,NameArray=[]):
 
     print("Variance by group")
     for i in range(0,len(A)):
-        print(f" {i}: {np.var(A[i])}")
+        if NameArray != []:
+            print(f" {NameArray[i]}: {np.var(A[i])}")
+        else:
+            print(f" {i}: {np.var(A[i])}")
 
+def TwoWayAnova_Residual_Analysis(A,sig,GroupNameArray=[],MethodNameArray=[]):
+    data = {"value":[],"group":[],"method":[]}
+    for i in range(0,len(A)):
+        for j in range(0,len(A[i])):
+            data["value"].append(A[i][j])
+            data["group"].append(str(i))
+            data["method"].append(str(j))
+    df = pd.DataFrame(data)
+    fit = smf.ols("value ~ C(group) + C(method)", data=df).fit()
+
+    n = len(data['value'])
+    k = len(A)
+    Residuals = fit.resid
+
+    print("Normality")
+    QQplot(Residuals)
+
+    print("Variance by group")
+    for i in range(0,len(A)):
+        if GroupNameArray != []:
+            print(f" {GroupNameArray[i]}: {np.var(A[i])}")
+        else:
+            print(f" {i}: {np.var(A[i])}")
+    print("")
+    print("Variance by method")
+    for i in range(0,len(A[0])):
+        def columnArr(OldArray,index):
+            arr = []
+            for j in range(0,len(OldArray)):
+                if len(OldArray[j]) > index:
+                    arr.append(OldArray[j][index])
+            return arr
+
+        if MethodNameArray != []:
+            print(f" {MethodNameArray[i]}: {np.var(columnArr(A,i))}")
+        else:
+            print(f" {i}: {np.var(columnArr(A,i))}")
 
 #-----------------------------------------------------------------------------------------------------------------------------------------#'
 print("----- Current results start here -----")
