@@ -319,19 +319,19 @@ def Single_Proportion_CI(tot,successful,sig):
 #--------------------------------------------------------------------------------------------------------------------------------#
 #Power
 
-def CalcPower(nobs,sd,delta,sig,ratio,power):
+def TwoCalcPower(nobs,sd,delta,sig,ratio,power):
     #Testpower for INDEPENDANT 2 samples
     calcpower = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=sig, nobs1=nobs,ratio=ratio)
 
     return calcpower
 
-def CalcSize(nobs,sd,delta,sig,ratio,power):
+def TwoCalcSize(nobs,sd,delta,sig,ratio,power):
     #Testpower for INDEPENDANT 2 samples
     calcsize = smp.TTestIndPower().solve_power(effect_size=delta/sd,alpha=sig, power=power,ratio=ratio)
 
     return (calcsize,calcsize*ratio)
 
-def CalcMeasureableSize(nobs,sd,delta,sig,ratio,power):
+def TwoCalcMeasureableSize(nobs,sd,delta,sig,ratio,power):
     #Testpower for INDEPENDANT 2 samples
     effect_size = smp.TTestPower().solve_power(nobs=nobs, alpha=sig,power=power,ratio=ratio)
 
@@ -367,7 +367,7 @@ def WelchTest_Equal(A,B):
     print(f"t-obs: {res[0]}")
     print(f"p-value: {res[1]}")
 
-def TableHypo_Test_Equal(A,RowNames,ColumnNames):
+def ProportionTable_HypTest_Equal(A,RowNames,ColumnNames):
     table_data = np.array(A)
     pill_study = pd.DataFrame(table_data, index=RowNames, columns=ColumnNames)
     print(pill_study)
@@ -381,7 +381,6 @@ def ProportionHypTest(tot,successes,psample,phyp):
     z_obs,p_value = smprop.proportions_ztest(count=successes, nobs=tot, value=psample, prop_var=phyp) 
     # without showing only four decimal places
     print(f"p-value: {2 * stats.norm.cdf(z_obs, loc=0, scale=1)}")
-
 
 #-------------------------------------------------------------------------------------------------------------------------------#
 #Non-Parametric Bootstrapping
